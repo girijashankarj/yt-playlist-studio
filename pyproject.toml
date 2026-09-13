@@ -1,0 +1,49 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "yt-playlist-studio"
+version = "0.1.0"
+description = "Turn any YouTube playlist into mood-based playlists you can actually use."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+authors = [{ name = "Girija Shankar Jambhale" }]
+keywords = ["youtube", "playlist", "music", "mcp", "cli"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3 :: Only",
+  "Topic :: Multimedia :: Sound/Audio",
+]
+dependencies = ["pyyaml>=6.0", "openpyxl>=3.1", "python-dotenv>=1.0"]
+
+[project.optional-dependencies]
+api = ["google-api-python-client>=2.100", "google-auth-oauthlib>=1.2", "google-auth>=2.30"]
+mcp = ["mcp>=1.2"]
+dev = ["pytest>=8.0", "ruff>=0.6"]
+all = ["yt-playlist-studio[api,mcp,dev]"]
+
+[project.scripts]
+ytps = "ytps.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/girijashankarj/yt-playlist-studio"
+Issues = "https://github.com/girijashankarj/yt-playlist-studio/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ytps"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

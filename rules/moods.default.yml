@@ -1,0 +1,102 @@
+# Mood rule pack.
+#
+# Add a mood by adding a block here and opening a PR - no Python required.
+#
+# Each mode may use:
+#   any_of:   {field: [values]}   row matches if ANY listed value hits (fields AND together)
+#   none_of:  {field: [values]}   row is excluded if ANY listed value hits
+#   min_sec / max_sec             duration window in seconds
+# Fields: language, genre, sub_genre, category, artist, channel
+#
+# Songs deliberately appear in more than one mood. Anything matching no mode at all
+# is collected into the catch-all so nothing is ever silently dropped.
+
+name: moods.default
+description: Activity and feel based moods, tuned on a 1,258-song Bollywood + Hollywood library.
+catch_all: Misc
+catch_all_description: Everything that fits no other mode
+
+modes:
+  - name: ToWork
+    description: Pumped-up morning commute
+    any_of: { category: [Party, Workout, Remix], sub_genre: [Dance, Anthem, Synth, Rap] }
+    min_sec: 120
+    max_sec: 420
+
+  - name: FromWork
+    description: Decompress on the way home
+    any_of:
+      category: [Smooth, Love, Old]
+      sub_genre: [Melancholy, Romantic, Acoustic, Synth, Ballad]
+    min_sec: 120
+    max_sec: 420
+
+  - name: Walk
+    description: Steady pace for brisk walking
+    any_of: { category: [Party, Workout], sub_genre: [Dance, Anthem] }
+    none_of: { genre: [Phonk, Metal], sub_genre: [Rap] }
+    min_sec: 150
+    max_sec: 330
+
+  - name: Gym
+    description: Hardest-hitting, for the workout
+    match: any          # this mode ORs its clauses instead of ANDing them
+    any_of: { category: [Workout], genre: [Phonk, Metal], sub_genre: [Rap] }
+    min_sec: 120
+    max_sec: 420
+
+  - name: Drive
+    description: Open-road long drive
+    any_of:
+      sub_genre: [Romantic, Anthem, Acoustic, Classical-Fusion, Ballad, Synth]
+      category: [Smooth, Old, Love, Party]
+    min_sec: 120
+    max_sec: 420
+
+  - name: Instrumental
+    description: Music only, no vocals
+    any_of: { language: [Instrumental] }
+
+  - name: Love
+    description: Romantic songs
+    match: any
+    any_of: { category: [Love], sub_genre: [Romantic] }
+    min_sec: 120
+    max_sec: 420
+
+  - name: Chill
+    description: Pleasant, easy listening
+    any_of:
+      category: [Smooth]
+      sub_genre: [Acoustic, Ambient, Romantic, Classical-Fusion, Ballad]
+    min_sec: 120
+    max_sec: 420
+
+  - name: Focus
+    description: Background music for deep work
+    match: any
+    any_of: { category: [Focus], sub_genre: [Ambient] }
+
+  - name: Party
+    description: Full party energy
+    any_of: { category: [Party] }
+    min_sec: 120
+    max_sec: 420
+
+  - name: Retro
+    description: Older classics
+    any_of: { category: [Old] }
+
+  - name: LateNight
+    description: Melancholy, late-night listening
+    any_of: { sub_genre: [Melancholy] }
+    min_sec: 120
+    max_sec: 420
+
+  - name: Remix
+    description: Remixes, mashups and sped-up edits
+    any_of: { category: [Remix] }
+
+  - name: Devotional
+    description: Bhajans and devotional tracks
+    any_of: { category: [Devotional] }

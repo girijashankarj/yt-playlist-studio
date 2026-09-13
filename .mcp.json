@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "yt-playlist-studio": {
+      "command": "python",
+      "args": ["-m", "ytps.mcp"],
+      "env": {
+        "YTPS_STATE_DIR": ".ytps",
+        "YTPS_OUTPUT_DIR": "out"
+      }
+    }
+  }
+}

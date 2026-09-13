@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pytest:*)",
+      "Bash(ruff:*)",
+      "Bash(ytps fetch:*)",
+      "Bash(ytps tag:*)",
+      "Bash(ytps chunk:*)",
+      "Bash(ytps export:*)",
+      "Bash(ytps rules:*)",
+      "Bash(ytps quota:*)",
+      "Bash(ytps publish links:*)"
+    ],
+    "ask": [
+      "Bash(ytps publish api:*)",
+      "Bash(git push:*)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.tokens/**)"
+    ]
+  }
+}
