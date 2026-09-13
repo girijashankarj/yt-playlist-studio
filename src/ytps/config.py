@@ -39,6 +39,21 @@ CONSOLE = "https://console.cloud.google.com/apis/credentials"
 SETUP_DOC = "see docs/auth-setup.md"
 
 
+def _int_env(value: str | None, default: int) -> int:
+    """Blank is not zero.
+
+    A .env copied from .env.example has empty values for anything the user did not
+    fill in, so `int("")` would crash every command. Treat blank as "unset".
+    """
+    text = (value or "").strip()
+    if not text:
+        return default
+    try:
+        return int(text)
+    except ValueError as e:
+        raise ValueError(f"expected a number, got {value!r}") from e
+
+
 @dataclass
 class Config:
     api_key: str | None = None
@@ -60,11 +75,11 @@ class Config:
             api_key=g("YT_API_KEY") or None,
             client_id=g("YT_OAUTH_CLIENT_ID") or None,
             client_secret=g("YT_OAUTH_CLIENT_SECRET") or None,
-            token_path=Path(g("YT_OAUTH_TOKEN_PATH", ".tokens/token.json")),
-            oauth_port=int(g("YT_OAUTH_PORT", "0")),
-            daily_quota=int(g("YTPS_DAILY_QUOTA", "10000")),
-            state_dir=Path(g("YTPS_STATE_DIR", ".ytps")),
-            output_dir=Path(g("YTPS_OUTPUT_DIR", "out")),
+            token_path=Path(g("YT_OAUTH_TOKEN_PATH") or ".tokens/token.json"),
+            oauth_port=_int_env(g("YT_OAUTH_PORT"), 0),
+            daily_quota=_int_env(g("YTPS_DAILY_QUOTA"), 10_000),
+            state_dir=Path(g("YTPS_STATE_DIR") or ".ytps"),
+            output_dir=Path(g("YTPS_OUTPUT_DIR") or "out"),
             prefer_api_for_reads=g("YTPS_PREFER_API", "").lower() in {"1", "true", "yes"},
         )
 

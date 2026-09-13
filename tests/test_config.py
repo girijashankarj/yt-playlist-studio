@@ -46,3 +46,33 @@ def test_prefer_api_only_applies_with_a_key():
 def test_unknown_operation_rejected():
     with pytest.raises(ValueError):
         Config().resolve_tier("frobnicate")
+
+
+def test_blank_env_values_fall_back_to_defaults(monkeypatch):
+    # .env.example ships blank values; a copied .env must not crash every command
+    for var in ("YT_OAUTH_PORT", "YTPS_DAILY_QUOTA", "YT_OAUTH_TOKEN_PATH",
+                "YTPS_STATE_DIR", "YTPS_OUTPUT_DIR"):
+        monkeypatch.setenv(var, "")
+    cfg = Config.load(env_file=None)
+    assert cfg.oauth_port == 0
+    assert cfg.daily_quota == 10_000
+    assert str(cfg.token_path) == ".tokens/token.json"
+    assert str(cfg.state_dir) == ".ytps"
+
+
+def test_whitespace_only_env_value_is_treated_as_blank(monkeypatch):
+    monkeypatch.setenv("YT_OAUTH_PORT", "   ")
+    assert Config.load(env_file=None).oauth_port == 0
+
+
+def test_numeric_env_values_are_read(monkeypatch):
+    monkeypatch.setenv("YT_OAUTH_PORT", "8080")
+    monkeypatch.setenv("YTPS_DAILY_QUOTA", "50000")
+    cfg = Config.load(env_file=None)
+    assert cfg.oauth_port == 8080 and cfg.daily_quota == 50_000
+
+
+def test_non_numeric_env_value_says_what_was_wrong(monkeypatch):
+    monkeypatch.setenv("YT_OAUTH_PORT", "eighty-eighty")
+    with pytest.raises(ValueError, match="expected a number"):
+        Config.load(env_file=None)
