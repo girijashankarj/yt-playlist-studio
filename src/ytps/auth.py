@@ -119,6 +119,65 @@ def whoami(cfg: Config) -> dict:
     return {"channel": items[0]["snippet"]["title"], "channel_id": items[0]["id"]}
 
 
+PLACEHOLDER_HINTS = ("replacethis", "abcdefghijklmnop", "123456789012", "xxxx", "yyyy")
+
+
+def mask(value: str | None) -> str:
+    """Show enough to recognise a value, never enough to use it."""
+    if not value:
+        return "(not set)"
+    if len(value) <= 12:
+        return value[:2] + "…" + value[-2:]
+    return value[:6] + "…" + value[-6:]
+
+
+def check_credentials(cfg: Config) -> dict:
+    """Validate credential *shape* offline. Makes no network calls.
+
+    Exists so you can confirm a paste worked without showing the secret to anyone.
+    """
+    problems, warnings = [], []
+    cid, sec = cfg.client_id, cfg.client_secret
+
+    if not cid:
+        problems.append("YT_OAUTH_CLIENT_ID is empty")
+    else:
+        if not cid.endswith(".apps.googleusercontent.com"):
+            problems.append("YT_OAUTH_CLIENT_ID should end with .apps.googleusercontent.com")
+        if any(h in cid.lower() for h in PLACEHOLDER_HINTS):
+            problems.append("YT_OAUTH_CLIENT_ID still looks like the placeholder")
+
+    if not sec:
+        problems.append("YT_OAUTH_CLIENT_SECRET is empty")
+    else:
+        if any(h in sec.lower() for h in PLACEHOLDER_HINTS):
+            problems.append("YT_OAUTH_CLIENT_SECRET still looks like the placeholder")
+        elif not sec.startswith("GOCSPX-"):
+            warnings.append(
+                "YT_OAUTH_CLIENT_SECRET does not start with GOCSPX-. Older secrets differ, "
+                "so this may be fine - but check you copied the secret, not the client ID."
+            )
+        if sec.endswith(".apps.googleusercontent.com"):
+            problems.append("YT_OAUTH_CLIENT_SECRET holds a client ID - the two are swapped")
+
+    if cfg.oauth_port:
+        warnings.append(
+            f"YT_OAUTH_PORT={cfg.oauth_port}: your client must list "
+            f"http://localhost:{cfg.oauth_port}/ as an authorised redirect URI."
+        )
+
+    return {
+        "client_id": mask(cid),
+        "client_secret": mask(sec),
+        "oauth_port": cfg.oauth_port or "random (Desktop-app client)",
+        "token_cached": cfg.token_path.exists(),
+        "token_path": str(cfg.token_path),
+        "problems": problems,
+        "warnings": warnings,
+        "ready": not problems,
+    }
+
+
 def token_info(cfg: Config) -> dict:
     if not cfg.token_path.exists():
         return {"cached": False}

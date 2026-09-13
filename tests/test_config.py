@@ -76,3 +76,43 @@ def test_non_numeric_env_value_says_what_was_wrong(monkeypatch):
     monkeypatch.setenv("YT_OAUTH_PORT", "eighty-eighty")
     with pytest.raises(ValueError, match="expected a number"):
         Config.load(env_file=None)
+
+
+def test_mask_never_reveals_a_whole_secret():
+    from ytps.auth import mask
+
+    secret = "GOCSPX-SuperSecretValueHere12345"
+    out = mask(secret)
+    assert secret not in out and "…" in out
+    assert mask(None) == "(not set)"
+
+
+def test_check_rejects_the_shipped_placeholders():
+    from ytps.auth import check_credentials
+
+    cfg = Config(
+        client_id="123456789012-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com",
+        client_secret="GOCSPX-ReplaceThisWithYourRealSecret",
+    )
+    r = check_credentials(cfg)
+    assert not r["ready"]
+    assert any("placeholder" in p for p in r["problems"])
+
+
+def test_check_catches_swapped_id_and_secret():
+    from ytps.auth import check_credentials
+
+    cid = "99887766-realish.apps.googleusercontent.com"
+    r = check_credentials(Config(client_id=cid, client_secret=cid))
+    assert not r["ready"]
+    assert any("swapped" in p for p in r["problems"])
+
+
+def test_check_passes_on_well_formed_credentials():
+    from ytps.auth import check_credentials
+
+    r = check_credentials(
+        Config(client_id="99887766-realish.apps.googleusercontent.com",
+               client_secret="GOCSPX-aRealLookingSecret")
+    )
+    assert r["ready"] and not r["problems"]

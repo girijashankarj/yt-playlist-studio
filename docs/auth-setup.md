@@ -50,14 +50,20 @@ playlists — that is OAuth's job.
    > if you distribute the app to other people.
 
 3. **Credentials → Create credentials → OAuth client ID → Desktop app**.
-4. Copy the client ID and secret into `.env`:
+4. Copy the client ID and secret into `.env` (it ships with placeholders of the right shape):
 
 ```dotenv
 YT_OAUTH_CLIENT_ID=xxxx.apps.googleusercontent.com
 YT_OAUTH_CLIENT_SECRET=xxxx
 ```
 
-5. First run opens your browser for consent. The refresh token is cached at
+5. Confirm the paste worked — this masks both values and makes no network calls:
+
+```bash
+ytps auth check
+```
+
+6. First run opens your browser for consent. The refresh token is cached at
    `YT_OAUTH_TOKEN_PATH` (default `.tokens/token.json`, written `chmod 600`, gitignored).
 
 **This tool never sees your Google password.** Consent happens on Google's own pages.

@@ -199,6 +199,27 @@ def cmd_publish_api(a) -> int:
     return 0 if result["complete"] else 2
 
 
+def cmd_auth_check(a) -> int:
+    from .auth import check_credentials
+
+    r = check_credentials(Config.load())
+    print(f"  client id     {r['client_id']}")
+    print(f"  client secret {r['client_secret']}")
+    print(f"  callback port {r['oauth_port']}")
+    print(f"  token cached  {'yes - ' + r['token_path'] if r['token_cached'] else 'no (first run will ask for consent)'}")
+    for w in r["warnings"]:
+        print(f"\n  note: {w}")
+    if r["problems"]:
+        print("\n  not ready:")
+        for pr in r["problems"]:
+            print(f"    - {pr}")
+        print("\n  Edit .env, then run this again. See docs/auth-setup.md.")
+        return 1
+    print("\n  Credentials look well-formed. Nothing has been sent to Google yet -")
+    print("  the first publish will open your browser once to approve access.")
+    return 0
+
+
 def cmd_quota(a) -> int:
     cfg = Config.load()
     print(json.dumps(Quota(cfg.state_dir / "quota.json", cfg.daily_quota).status(), indent=2))
@@ -264,6 +285,11 @@ def build_parser() -> argparse.ArgumentParser:
     pa.add_argument("--no-dry-run", dest="dry_run", action="store_false", help="actually publish")
     pa.add_argument("--yes", action="store_true", help="skip the confirmation prompt")
     pa.set_defaults(func=cmd_publish_api)
+
+    ac = sub.add_parser("auth", help="check credentials without revealing them")
+    acsub = ac.add_subparsers(dest="authcmd", required=True)
+    acc = acsub.add_parser("check", help="validate .env credential format offline")
+    acc.set_defaults(func=cmd_auth_check)
 
     q = sub.add_parser("quota", help="show today's API quota")
     q.set_defaults(func=cmd_quota)

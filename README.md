@@ -45,7 +45,7 @@ This is the part most tools get wrong. What you need depends on **what you are d
 
 > **Tip:** setting a playlist to **Unlisted** rather than Private keeps it out of search while staying readable with no credentials at all. Easiest path if you just want to share a list with this tool.
 
-Everything lives in `.env` (copy `.env.example`). You bring your own Google Cloud project — this repo ships no keys. See [docs/auth-setup.md](docs/auth-setup.md).
+Everything lives in `.env` (copy `.env.example`, then `ytps auth check` to confirm your paste without revealing it). You bring your own Google Cloud project — this repo ships no keys. See [docs/auth-setup.md](docs/auth-setup.md).
 
 > **Already have a Google Cloud project?** Reuse it — you only need a client of type *Desktop app*, or set `YT_OAUTH_PORT` to reuse a *Web application* one. [Details](docs/auth-setup.md).
 
