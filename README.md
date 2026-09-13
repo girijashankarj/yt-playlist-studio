@@ -47,6 +47,8 @@ This is the part most tools get wrong. What you need depends on **what you are d
 
 Everything lives in `.env` (copy `.env.example`). You bring your own Google Cloud project — this repo ships no keys. See [docs/auth-setup.md](docs/auth-setup.md).
 
+> **If you plan to publish, set your OAuth consent screen to "In production" first.** Apps left in *Testing* get a refresh token that expires after **7 days** — long enough to break any sizeable publish job halfway through. [Details](docs/auth-setup.md).
+
 ## The quota reality
 
 If you publish via the official API, know this before you start:

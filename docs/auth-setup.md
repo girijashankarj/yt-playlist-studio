@@ -27,17 +27,37 @@ playlists — that is OAuth's job.
 ## OAuth client (private reads + all writes)
 
 1. Same project → **APIs & Services → OAuth consent screen**.
-   - User type **External** is fine. While the app is in *Testing*, add your own Google
-     account under **Test users** — otherwise consent will be refused.
-2. **Credentials → Create credentials → OAuth client ID → Desktop app**.
-3. Copy the client ID and secret into `.env`:
+   - User type **External** is fine.
+   - While the app is in *Testing*, add your own Google account under **Test users** —
+     otherwise consent is refused.
+
+2. **Set Publishing status to "In production."** Do not skip this.
+
+   > ### The 7-day trap
+   >
+   > Google issues apps in **Testing** status a refresh token that **expires after 7
+   > days** ([docs](https://developers.google.com/identity/protocols/oauth2)). The
+   > exemption is only for apps requesting nothing beyond name/email/profile — any
+   > YouTube scope is well outside that.
+   >
+   > So in Testing, a long publish job dies with `invalid_grant` about a week in, and
+   > you have to re-consent. Since the API can only add ~200 songs a day, **any library
+   > over ~1,400 songs will outlive a Testing-status token.**
+   >
+   > "In production" issues a non-expiring refresh token. Google will show a
+   > **"Google hasn't verified this app"** screen the first time — expected for a
+   > personal tool. Click **Advanced → Go to (app name)**. Verification is only needed
+   > if you distribute the app to other people.
+
+3. **Credentials → Create credentials → OAuth client ID → Desktop app**.
+4. Copy the client ID and secret into `.env`:
 
 ```dotenv
 YT_OAUTH_CLIENT_ID=xxxx.apps.googleusercontent.com
 YT_OAUTH_CLIENT_SECRET=xxxx
 ```
 
-4. First run opens your browser for consent. The refresh token is cached at
+5. First run opens your browser for consent. The refresh token is cached at
    `YT_OAUTH_TOKEN_PATH` (default `.tokens/token.json`, written `chmod 600`, gitignored).
 
 **This tool never sees your Google password.** Consent happens on Google's own pages.
@@ -61,4 +81,6 @@ Delete `.tokens/token.json`, and remove the app at
 | `access_denied` during consent | app in Testing, you are not a test user | add your account under Test users |
 | `quotaExceeded` | 10,000 units spent today | wait for midnight US/Pacific, or use `ytps publish links` |
 | `playlistNotFound` on your own list | it is Private and you are reading keyless | set up OAuth, or make it Unlisted |
+| `invalid_grant` after it worked for days | app is in **Testing**, refresh token hit its 7-day expiry | set Publishing status to **In production**, delete `.tokens/token.json`, re-run to re-consent |
+| `Google hasn't verified this app` | expected for a personal tool in production | **Advanced → Go to (app name)** |
 | `The Data API path needs extra packages` | optional deps missing | `pip install "yt-playlist-studio[api]"` |

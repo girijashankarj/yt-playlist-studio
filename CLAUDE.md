@@ -66,3 +66,7 @@ Edit `rules/moods.default.yml`, run `ytps rules` to confirm it parses, then
   read. `Playlist.hidden_count` is that gap; surface it, don't hide it.
 - `coverage()` counts unique video ids — a playlist may legitimately list the same
   video twice.
+- OAuth apps left in **Testing** publishing status get a refresh token that expires
+  after 7 days. Any publish job longer than that (i.e. more than ~1,400 songs at the
+  200-adds/day cap) needs the consent screen set to **In production**, or it dies with
+  `invalid_grant` mid-job. Tell users this *before* they start a long job, not after.
