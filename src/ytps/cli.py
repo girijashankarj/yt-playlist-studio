@@ -220,6 +220,44 @@ def cmd_auth_check(a) -> int:
     return 0
 
 
+def cmd_publish_queue(a) -> int:
+    cfg = Config.load()
+    quota = Quota(cfg.state_dir / "quota.json", cfg.daily_quota)
+    directory = Path(a.directory)
+    from .publish.queue import QueueState, discover, run_queue
+
+    if a.status:
+        st = QueueState.load(cfg.state_dir / "queue.json")
+        discover(directory, st)
+        print(json.dumps({"queue": st.summary(), "quota": quota.status()}, indent=2))
+        for e in sorted(st.entries.values(), key=lambda x: (x.status != "done", x.name)):
+            mark = {"done": "done ", "partial": "part ", "pending": "     "}[e.status]
+            print(f"  [{mark}] {e.name:<18}{e.added:>4}/{e.total:<5}{e.url}")
+        return 0
+
+    from .auth import build_service, whoami
+    from .config import Tier
+
+    who = whoami(cfg)
+    print(f"YouTube account: {who.get('channel')}", file=sys.stderr)
+    if not a.yes:
+        reply = input(f"Publish queue from {directory} as {a.privacy} playlists? [y/N] ")
+        if reply.strip().lower() not in {"y", "yes"}:
+            print("Aborted.", file=sys.stderr)
+            return 1
+    service = build_service(cfg, Tier.OAUTH, write=True)
+    result = run_queue(directory, service, quota, cfg.state_dir, privacy=a.privacy,
+                       order=a.order, load_songs=_load_songs)
+    print(json.dumps(result, indent=2))
+    if result["all_done"]:
+        print("\nQueue complete - every playlist published.", file=sys.stderr)
+    else:
+        print(f"\n{result['songs_remaining']} songs left. Quota resets "
+              f"{result['resume_after']}; run this again after that to continue.",
+              file=sys.stderr)
+    return 0
+
+
 def cmd_quota(a) -> int:
     cfg = Config.load()
     print(json.dumps(Quota(cfg.state_dir / "quota.json", cfg.daily_quota).status(), indent=2))
@@ -290,6 +328,14 @@ def build_parser() -> argparse.ArgumentParser:
     acsub = ac.add_subparsers(dest="authcmd", required=True)
     acc = acsub.add_parser("check", help="validate .env credential format offline")
     acc.set_defaults(func=cmd_auth_check)
+
+    pq = psub.add_parser("queue", help="publish a directory of playlists across days")
+    pq.add_argument("directory")
+    pq.add_argument("--privacy", default="private", choices=["private", "unlisted", "public"])
+    pq.add_argument("--order", default="smallest", choices=["smallest", "largest", "name"])
+    pq.add_argument("--status", action="store_true", help="show progress, publish nothing")
+    pq.add_argument("--yes", action="store_true")
+    pq.set_defaults(func=cmd_publish_queue)
 
     q = sub.add_parser("quota", help="show today's API quota")
     q.set_defaults(func=cmd_quota)

@@ -59,6 +59,29 @@ Any playlist over **199 songs cannot be completed in a single day**, no matter w
 will span two or more runs. That is fine: the writer saves a resume file and skips what
 is already there, so you just run it again after the reset.
 
+### Letting it run itself
+
+`publish queue` walks a directory of playlists, publishes what today's quota allows,
+and stops. Run it again tomorrow and it resumes — including part-way through a playlist.
+
+```bash
+ytps publish queue out/moods --privacy private --yes   # today's batch
+ytps publish queue out/moods --status                  # progress, publishes nothing
+```
+
+State lives in `.ytps/queue.json`. It never re-adds a song already in a playlist, so
+re-running is always safe. `--order smallest` (the default) completes the most playlists
+per day; `--order largest` chips away at the big ones first.
+
+Schedule it daily and a 16-day job needs no attention:
+
+```cron
+0 9 * * *  cd /path/to/project && ./.venv/bin/ytps publish queue out/moods --yes >> .ytps/cron.log 2>&1
+```
+
+> Unattended runs only work while your refresh token is alive. That is the other reason
+> the consent screen must be **In production** — see [auth-setup.md](auth-setup.md).
+
 ### The hybrid approach
 
 Splitting by size is usually fastest:

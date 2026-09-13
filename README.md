@@ -71,7 +71,7 @@ ytps publish api   out/moods/Gym.csv --dry-run   # prices the job, makes zero ca
 ytps publish links out/moods/                    # free, instant, no OAuth
 ```
 
-`publish api` is quota-aware and resumable — it stops cleanly at the cap and tells you when it can continue. `publish links` generates YouTube import links (50 videos each) plus an HTML console; you click through and save them yourself. For a big library, that is an hour instead of a fortnight.
+`publish queue` walks a whole folder of playlists, publishes what the day's quota allows and resumes tomorrow — schedule it and a multi-day job runs itself. `publish api` is quota-aware and resumable — it stops cleanly at the cap and tells you when it can continue. `publish links` generates YouTube import links (50 videos each) plus an HTML console; you click through and save them yourself. For a big library, that is an hour instead of a fortnight.
 
 ## Writing your own moods
 
