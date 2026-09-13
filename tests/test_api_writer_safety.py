@@ -80,3 +80,81 @@ def test_quota_error_names_the_free_alternative(tmp_path):
     with pytest.raises(QuotaExceeded) as e:
         quota.charge("playlistItems.insert")
     assert "publish links" in str(e.value)
+
+
+# --- transient failure handling -------------------------------------------------
+class _Resp:
+    def __init__(self, status):
+        self.status = status
+
+
+class _HttpError(Exception):
+    def __init__(self, status):
+        self.resp = _Resp(status)
+        super().__init__(f"HTTP {status}")
+
+
+class FlakyRequest:
+    """Fails with `status` for the first `fail_times` calls, then succeeds."""
+
+    def __init__(self, fail_times, status=409):
+        self.fail_times, self.status, self.calls = fail_times, status, 0
+
+    def execute(self):
+        self.calls += 1
+        if self.calls <= self.fail_times:
+            raise _HttpError(self.status)
+        return {"ok": True}
+
+
+@pytest.mark.parametrize("status", [409, 429, 500, 502, 503, 504])
+def test_transient_errors_are_retried(status):
+    from ytps.publish.api_writer import execute
+
+    req = FlakyRequest(2, status)
+    assert execute(req, sleep=lambda _: None) == {"ok": True}
+    assert req.calls == 3
+
+
+def test_permanent_errors_are_not_retried():
+    from ytps.publish.api_writer import execute
+
+    req = FlakyRequest(5, status=404)
+    with pytest.raises(_HttpError):
+        execute(req, sleep=lambda _: None)
+    assert req.calls == 1, "a 404 must fail immediately, not burn retries"
+
+
+def test_gives_up_after_the_attempt_limit():
+    from ytps.publish.api_writer import execute
+
+    req = FlakyRequest(99, status=409)
+    with pytest.raises(_HttpError):
+        execute(req, attempts=4, sleep=lambda _: None)
+    assert req.calls == 4
+
+
+class CrashingService(FakeService):
+    """Succeeds for `ok_inserts` songs, then raises a non-retryable error."""
+
+    def __init__(self, ok_inserts):
+        super().__init__()
+        self.ok_inserts = ok_inserts
+
+    def insert(self, part, body):
+        if "status" in part:
+            return super().insert(part, body)
+        if len(self.inserted) >= self.ok_inserts:
+            raise _HttpError(404)
+        return super().insert(part, body)
+
+
+def test_progress_is_saved_even_when_publishing_crashes(quota, tmp_path):
+    """Regression: a crash mid-loop used to discard up to 9 recorded adds."""
+    from ytps.publish.api_writer import PublishState
+
+    with pytest.raises(_HttpError):
+        publish("Gym", "d", songs(20), CrashingService(7), quota, tmp_path, dry_run=False)
+    saved = PublishState.load(tmp_path / "Gym.json", "Gym")
+    assert len(saved.added) == 7, "every successful add must survive the crash"
+    assert saved.playlist_id

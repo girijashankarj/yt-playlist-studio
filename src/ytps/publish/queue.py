@@ -129,6 +129,9 @@ def run_queue(
                 state_dir / "state", privacy=privacy, dry_run=False,
             )
         except QuotaExceeded as e:
+            # the playlist may exist with some songs already in it; keep what we know
+            entry.status = "partial" if entry.playlist_id else "pending"
+            state.save()
             stopped = str(e)
             break
 

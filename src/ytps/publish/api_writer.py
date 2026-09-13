@@ -8,12 +8,53 @@ than fail halfway through.
 from __future__ import annotations
 
 import json
+import random
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..errors import QuotaExceeded
 from ..models import Song
-from ..quota import Quota
+from ..quota import Quota, next_reset
+
+# YouTube returns these for load shedding, not for anything the caller did wrong.
+# 409 in particular is common on playlistItems.insert and simply needs retrying.
+RETRYABLE = {409, 429, 500, 502, 503, 504}
+
+
+def is_quota_error(e: Exception) -> bool:
+    """Google's 403 quotaExceeded is authoritative - our local ledger is only an estimate.
+
+    A sibling app sharing the Cloud project, or retries we did not count, can burn the
+    real allowance while the ledger still looks healthy.
+    """
+    if getattr(getattr(e, "resp", None), "status", None) != 403:
+        return False
+    blob = str(getattr(e, "content", "")) + str(e)
+    return "quotaExceeded" in blob or "exceeded your" in blob
+
+
+def execute(request, attempts: int = 6, sleep=time.sleep):
+    """Run an API request, retrying transient failures with exponential backoff.
+
+    Without this a single 409 - which YouTube hands out freely during bulk inserts -
+    aborts a multi-hundred-song publish.
+    """
+    last = None
+    for attempt in range(attempts):
+        try:
+            return request.execute()
+        except Exception as e:  # googleapiclient.errors.HttpError, kept loose for testability
+            status = getattr(getattr(e, "resp", None), "status", None)
+            if status == 403 and is_quota_error(e):
+                raise QuotaExceeded(0, 0, next_reset()) from e
+            if status not in RETRYABLE:
+                raise
+            last = e
+            if attempt == attempts - 1:
+                break
+            sleep(min(2**attempt, 16) + random.uniform(0, 0.75))
+    raise last  # type: ignore[misc]
 
 
 @dataclass
@@ -93,16 +134,14 @@ def publish(
 
     if not state.playlist_id:
         quota.charge("playlists.insert")
-        resp = (
-            service.playlists()
-            .insert(
+        resp = execute(
+            service.playlists().insert(
                 part="snippet,status",
                 body={
                     "snippet": {"title": name, "description": description},
                     "status": {"privacyStatus": privacy},
                 },
             )
-            .execute()
         )
         state.playlist_id = resp["id"]
         state.save()
@@ -111,10 +150,11 @@ def publish(
         page = None
         while True:
             quota.charge("playlistItems.list")
-            r = (
-                service.playlistItems()
-                .list(part="contentDetails", playlistId=state.playlist_id, maxResults=50, pageToken=page)
-                .execute()
+            r = execute(
+                service.playlistItems().list(
+                    part="contentDetails", playlistId=state.playlist_id,
+                    maxResults=50, pageToken=page,
+                )
             )
             already |= {i["contentDetails"]["videoId"] for i in r.get("items", [])}
             page = r.get("nextPageToken")
@@ -122,31 +162,45 @@ def publish(
                 break
 
     added, skipped, stopped = 0, 0, None
-    for s in songs:
-        if s.video_id in already:
-            skipped += 1
-            continue
-        try:
-            quota.charge("playlistItems.insert")
-        except QuotaExceeded as e:
-            stopped = str(e)
-            break
-        service.playlistItems().insert(
-            part="snippet",
-            body={
-                "snippet": {
-                    "playlistId": state.playlist_id,
-                    "resourceId": {"kind": "youtube#video", "videoId": s.video_id},
-                }
-            },
-        ).execute()
-        state.added.append(s.video_id)
-        already.add(s.video_id)
-        added += 1
-        if added % 10 == 0:
-            state.save()
-
-    state.save()
+    try:
+        for s in songs:
+            if s.video_id in already:
+                skipped += 1
+                continue
+            try:
+                quota.charge("playlistItems.insert")
+            except QuotaExceeded as e:
+                stopped = str(e)
+                break
+            try:
+                execute(
+                    service.playlistItems().insert(
+                        part="snippet",
+                        body={
+                            "snippet": {
+                                "playlistId": state.playlist_id,
+                                "resourceId": {"kind": "youtube#video", "videoId": s.video_id},
+                            }
+                        },
+                    )
+                )
+            except QuotaExceeded:
+                # Google says we are done for today even if our ledger disagrees.
+                quota.exhaust()
+                stopped = (
+                    "Google reported the daily quota as exhausted. The local ledger is an "
+                    f"estimate and was behind. Resume after {next_reset()}."
+                )
+                break
+            state.added.append(s.video_id)
+            already.add(s.video_id)
+            added += 1
+            if added % 10 == 0:
+                state.save()
+    finally:
+        # never lose progress: an exception here still costs quota, and re-adding
+        # songs we already paid for would waste another day of allowance
+        state.save()
     remaining = len(songs) - len(already & {s.video_id for s in songs})
     return {
         "dry_run": False,

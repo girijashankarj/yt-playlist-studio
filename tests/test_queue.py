@@ -92,3 +92,18 @@ def test_rerun_after_completion_is_a_no_op(workdir, tmp_path):
     again = run_queue(workdir, FakeService(), quota, tmp_path, load_songs=loader)
     assert again["all_done"] and again["ran"] == []
     assert quota.used() == used, "a finished queue must not spend more quota"
+
+
+def test_googles_quota_error_stops_the_queue_cleanly(workdir, tmp_path):
+    """Google's 403 is authoritative even when our ledger still looks healthy."""
+    from tests_helpers import QuotaBlockedService  # noqa: F401
+
+    from ytps.publish.api_writer import is_quota_error
+
+    quota = Quota(tmp_path / "quota.json", daily=10_000)
+    svc = QuotaBlockedService(ok_inserts=1)
+    out = run_queue(workdir, svc, quota, tmp_path, load_songs=loader)
+    assert not out["all_done"]
+    assert "quota" in out["stopped_because"].lower()
+    assert quota.remaining() == 0, "ledger must sync to Google's verdict"
+    assert is_quota_error(svc.raised)

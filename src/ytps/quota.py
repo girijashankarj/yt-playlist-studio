@@ -84,6 +84,17 @@ class Quota:
         self.path.write_text(json.dumps(data, indent=1, sort_keys=True))
         return units
 
+    def exhaust(self) -> None:
+        """Record today as fully spent, because Google said so.
+
+        Keeps later runs from hammering an API that will only refuse them.
+        """
+        day = quota_day()
+        data = self._read()
+        data[day] = max(int(data.get(day, 0)), self.daily)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.write_text(json.dumps(data, indent=1, sort_keys=True))
+
     def status(self) -> dict:
         return {
             "day": quota_day(),
