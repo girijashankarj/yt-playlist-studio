@@ -75,9 +75,23 @@ per day; `--order largest` chips away at the big ones first.
 
 Schedule it daily and a 16-day job needs no attention:
 
-```cron
-0 9 * * *  cd /path/to/project && ./.venv/bin/ytps publish queue out/moods --yes >> .ytps/cron.log 2>&1
+```bash
+scripts/daily-publish.sh          # run it once by hand to check it works
 ```
+
+Schedule that script daily — with cron:
+
+```cron
+0 14 * * *  /path/to/project/scripts/daily-publish.sh
+```
+
+or on macOS with a LaunchAgent (`~/Library/LaunchAgents/`), using
+`StartCalendarInterval`. Either way it exits 0 even when it stops on quota, because
+that is the expected daily outcome rather than a failure.
+
+**Pick the time carefully.** Quota resets at midnight **US/Pacific**, which is 12:30 or
+13:30 the same day in IST, 08:00–09:00 in UK time, and so on. Schedule *after* the reset
+in your own timezone or the run finds an empty allowance.
 
 > Unattended runs only work while your refresh token is alive. That is the other reason
 > the consent screen must be **In production** — see [auth-setup.md](auth-setup.md).
