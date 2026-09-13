@@ -6,6 +6,7 @@ import argparse
 import csv
 import json
 import sys
+from dataclasses import asdict
 from pathlib import Path
 
 from . import __version__
@@ -16,6 +17,7 @@ from .models import Playlist, Song
 from .publish.api_writer import estimate
 from .publish.bulk_links import build_links
 from .quota import Quota
+from .reporting import render
 from .tagging import tag_coverage, tag_songs
 from .writers.csv_out import write_csv, write_m3u
 from .writers.html_console import write_console
@@ -228,11 +230,13 @@ def cmd_publish_queue(a) -> int:
 
     if a.status:
         st = QueueState.load(cfg.state_dir / "queue.json")
-        discover(directory, st)
-        print(json.dumps({"queue": st.summary(), "quota": quota.status()}, indent=2))
-        for e in sorted(st.entries.values(), key=lambda x: (x.status != "done", x.name)):
-            mark = {"done": "done ", "partial": "part ", "pending": "     "}[e.status]
-            print(f"  [{mark}] {e.name:<18}{e.added:>4}/{e.total:<5}{e.url}")
+        discover(directory, st, cfg.state_dir)
+        if a.json:
+            print(json.dumps({"queue": st.summary(), "quota": quota.status(),
+                              "playlists": [asdict(e) for e in st.entries.values()]}, indent=2))
+            return 0
+        print(render(list(st.entries.values()), st.summary(), quota.status(),
+                     next_run=a.next_run))
         return 0
 
     from .auth import build_service, whoami
@@ -248,13 +252,14 @@ def cmd_publish_queue(a) -> int:
     service = build_service(cfg, Tier.OAUTH, write=True)
     result = run_queue(directory, service, quota, cfg.state_dir, privacy=a.privacy,
                        order=a.order, load_songs=_load_songs)
-    print(json.dumps(result, indent=2))
-    if result["all_done"]:
-        print("\nQueue complete - every playlist published.", file=sys.stderr)
-    else:
-        print(f"\n{result['songs_remaining']} songs left. Quota resets "
-              f"{result['resume_after']}; run this again after that to continue.",
-              file=sys.stderr)
+    if a.json:
+        print(json.dumps(result, indent=2))
+        return 0
+    st = QueueState.load(cfg.state_dir / "queue.json")
+    discover(directory, st, cfg.state_dir)
+    print(render(list(st.entries.values()), st.summary(), quota.status(),
+                 channel=who.get("channel"), stopped=result["stopped_because"],
+                 next_run=a.next_run))
     return 0
 
 
@@ -334,6 +339,8 @@ def build_parser() -> argparse.ArgumentParser:
     pq.add_argument("--privacy", default="private", choices=["private", "unlisted", "public"])
     pq.add_argument("--order", default="smallest", choices=["smallest", "largest", "name"])
     pq.add_argument("--status", action="store_true", help="show progress, publish nothing")
+    pq.add_argument("--json", action="store_true", help="machine-readable output")
+    pq.add_argument("--next-run", default="", help="text to show for the next scheduled run")
     pq.add_argument("--yes", action="store_true")
     pq.set_defaults(func=cmd_publish_queue)
 

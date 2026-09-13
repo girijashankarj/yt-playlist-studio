@@ -79,11 +79,35 @@ def _count(path: Path) -> int:
         return sum(1 for _ in csv.DictReader(f))
 
 
-def discover(directory: Path, state: QueueState) -> None:
-    """Add any CSV not already tracked. Never forgets progress on re-run."""
+def discover(directory: Path, state: QueueState, state_dir: Path | None = None) -> None:
+    """Add any CSV not already tracked, then reconcile against per-playlist state.
+
+    A crash can create a playlist on YouTube before the queue records it, leaving the
+    queue claiming "not created yet" for something that exists. The per-playlist files
+    written by the publisher are the more reliable record, so adopt them - it costs no
+    quota, unlike asking YouTube.
+    """
     for p in sorted(directory.glob("*.csv")):
         if p.stem not in state.entries:
             state.entries[p.stem] = Entry(name=p.stem, source=str(p), total=_count(p))
+
+    if state_dir is None:
+        return
+    for entry in state.entries.values():
+        if entry.status == "done":
+            continue                      # never downgrade a finished playlist
+        f = state_dir / "state" / f"{entry.name}.json"
+        try:
+            data = json.loads(f.read_text())
+        except (FileNotFoundError, json.JSONDecodeError):
+            continue
+        pid = data.get("playlist_id")
+        if not pid:
+            continue
+        entry.playlist_id = pid
+        entry.url = f"https://www.youtube.com/playlist?list={pid}"
+        entry.added = max(entry.added, len(data.get("added", [])))
+        entry.status = "done" if entry.added >= entry.total else "partial"
 
 
 def run_queue(
@@ -102,7 +126,7 @@ def run_queue(
     big ones first; 'name' is alphabetical.
     """
     state = QueueState.load(state_dir / "queue.json")
-    discover(directory, state)
+    discover(directory, state, state_dir)
     state.save()
 
     pending = [e for e in state.entries.values() if e.status != "done"]

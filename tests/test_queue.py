@@ -107,3 +107,34 @@ def test_googles_quota_error_stops_the_queue_cleanly(workdir, tmp_path):
     assert "quota" in out["stopped_because"].lower()
     assert quota.remaining() == 0, "ledger must sync to Google's verdict"
     assert is_quota_error(svc.raised)
+
+
+def test_discover_adopts_playlists_a_crash_left_behind(workdir, tmp_path):
+    """A crash can create the playlist before the queue records it - don't lose it."""
+    import json
+
+    (tmp_path / "state").mkdir()
+    (tmp_path / "state" / "Large.json").write_text(json.dumps(
+        {"playlist_name": "Large", "playlist_id": "PLcrash123",
+         "added": ["Lar00000001", "Lar00000002"]}))
+
+    st = QueueState.load(tmp_path / "q.json")
+    discover(workdir, st, tmp_path)
+    e = st.entries["Large"]
+    assert e.playlist_id == "PLcrash123"
+    assert e.added == 2 and e.status == "partial"
+    assert e.url.endswith("PLcrash123")
+
+
+def test_reconcile_never_downgrades_a_finished_playlist(workdir, tmp_path):
+    import json
+
+    (tmp_path / "state").mkdir()
+    (tmp_path / "state" / "Small.json").write_text(json.dumps(
+        {"playlist_name": "Small", "playlist_id": "PLx", "added": ["only-one-x"]}))
+    st = QueueState.load(tmp_path / "q.json")
+    discover(workdir, st)
+    st.entries["Small"].status = "done"
+    st.entries["Small"].added = 2
+    discover(workdir, st, tmp_path)
+    assert st.entries["Small"].status == "done" and st.entries["Small"].added == 2

@@ -19,10 +19,8 @@ mkdir -p "$(dirname "$LOG")"
     echo "ytps not found at ./.venv/bin/ytps - is the venv built?"
     exit 1
   fi
-  ./.venv/bin/ytps publish queue "$PLAYLISTS" --privacy "$PRIVACY" --yes
-  echo "--- remaining ---"
-  ./.venv/bin/ytps publish queue "$PLAYLISTS" --status | head -8
-  echo
+  NO_COLOR=1 ./.venv/bin/ytps publish queue "$PLAYLISTS" \
+      --privacy "$PRIVACY" --yes --next-run "tomorrow, same time"
 } >> "$LOG" 2>&1
 
 # Never fail the scheduler: a quota stop is an expected daily outcome, not an error.
