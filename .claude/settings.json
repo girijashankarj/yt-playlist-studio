@@ -13,6 +13,7 @@
     ],
     "ask": [
       "Bash(ytps publish api:*)",
+      "Bash(ytps publish queue:*)",
       "Bash(git push:*)"
     ],
     "deny": [
