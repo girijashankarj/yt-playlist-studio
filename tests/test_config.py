@@ -91,7 +91,7 @@ def test_check_rejects_the_shipped_placeholders():
     from ytps.auth import check_credentials
 
     cfg = Config(
-        client_id="123456789012-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com",
+        client_id="123456789012-REPLACE_WITH_YOUR_CLIENT_ID.apps.googleusercontent.com",
         client_secret="GOCSPX-ReplaceThisWithYourRealSecret",
     )
     r = check_credentials(cfg)

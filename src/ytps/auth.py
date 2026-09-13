@@ -119,7 +119,11 @@ def whoami(cfg: Config) -> dict:
     return {"channel": items[0]["snippet"]["title"], "channel_id": items[0]["id"]}
 
 
-PLACEHOLDER_HINTS = ("replacethis", "abcdefghijklmnop", "123456789012", "xxxx", "yyyy")
+# Placeholders are deliberately un-real: a shipped example that matches the pattern of a
+# live credential trips every secret scanner, including this repo's own CI job.
+PLACEHOLDER_HINTS = (
+    "replace_with", "replacethis", "abcdefghijklmnop", "123456789012", "xxxx", "yyyy",
+)
 
 
 def mask(value: str | None) -> str:
