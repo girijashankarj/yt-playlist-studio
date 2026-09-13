@@ -7,6 +7,7 @@ which is the only honest model for an open-source tool that writes to accounts.
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 from .config import Config, Tier
@@ -68,7 +69,25 @@ def load_credentials(cfg: Config, scopes: list[str]):
             },
             scopes,
         )
-        creds = flow.run_local_server(port=0)
+        if cfg.oauth_port:
+            # A "Web application" client only accepts redirect URIs registered in the
+            # console, so the port cannot be random. Pin it and tell the user what to add.
+            print(
+                f"Using a fixed callback port. Your OAuth client must list this exact "
+                f"redirect URI:\n    http://localhost:{cfg.oauth_port}/\n"
+                "(Google Cloud console -> Clients -> your client -> Authorised redirect URIs)",
+                file=sys.stderr,
+            )
+        try:
+            creds = flow.run_local_server(port=cfg.oauth_port)
+        except OSError as e:
+            raise CredentialsRequired(
+                operation="OAuth consent",
+                missing=["a free local port"],
+                reason=f"could not open a local callback server on port {cfg.oauth_port}: {e}",
+                how="pick another port with YT_OAUTH_PORT, or unset it to use a random one "
+                    "(random ports work only with a Desktop-app client).",
+            ) from e
 
     cfg.token_path.parent.mkdir(parents=True, exist_ok=True)
     cfg.token_path.write_text(creds.to_json())

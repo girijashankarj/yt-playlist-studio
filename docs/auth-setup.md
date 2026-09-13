@@ -74,6 +74,44 @@ YT_OAUTH_CLIENT_SECRET=xxxx
 Delete `.tokens/token.json`, and remove the app at
 [myaccount.google.com/permissions](https://myaccount.google.com/permissions).
 
+## Reusing an OAuth client you already have
+
+If you already have a Google Cloud project with the YouTube Data API enabled, **reuse
+the project** — you keep the API enablement, the consent screen and the quota. You only
+need to check one thing about the **client**.
+
+Open your client in the console and look at **Application type**:
+
+| Your client type | What to do |
+|---|---|
+| **Desktop app** | Works as-is. Paste the ID and secret into `.env` and you are done. |
+| **Web application** | Either create a second client of type *Desktop app* in the same project (30 seconds, nothing else changes) — or keep this one and pin the callback port, below. |
+
+### Keeping a Web application client
+
+A Desktop client accepts a redirect on any loopback port, which is why this tool uses a
+random one. A Web client only accepts redirect URIs you have registered, so pin the port:
+
+```dotenv
+YT_OAUTH_PORT=8080
+```
+
+Then in the console, on that client, add this to **Authorised redirect URIs** — exactly,
+including the trailing slash:
+
+```
+http://localhost:8080/
+```
+
+### Two cautions when sharing a project
+
+- **Quota is per project, not per client.** If anything else in that project calls the
+  YouTube Data API, you are sharing the same 10,000 units/day. This tool's ledger only
+  counts its own spending, so your real remaining quota may be lower than `ytps quota`
+  reports.
+- **Check the consent screen's publishing status.** An existing project may still be in
+  *Testing*, which brings the 7-day refresh-token expiry described above.
+
 ## Troubleshooting
 
 | Message | Cause | Fix |
@@ -83,4 +121,5 @@ Delete `.tokens/token.json`, and remove the app at
 | `playlistNotFound` on your own list | it is Private and you are reading keyless | set up OAuth, or make it Unlisted |
 | `invalid_grant` after it worked for days | app is in **Testing**, refresh token hit its 7-day expiry | set Publishing status to **In production**, delete `.tokens/token.json`, re-run to re-consent |
 | `Google hasn't verified this app` | expected for a personal tool in production | **Advanced → Go to (app name)** |
+| `redirect_uri_mismatch`, or consent hangs after you approve | using a **Web application** client with a random port | set `YT_OAUTH_PORT` and register `http://localhost:<port>/` on the client — see above |
 | `The Data API path needs extra packages` | optional deps missing | `pip install "yt-playlist-studio[api]"` |

@@ -45,6 +45,7 @@ class Config:
     client_id: str | None = None
     client_secret: str | None = None
     token_path: Path = Path(".tokens/token.json")
+    oauth_port: int = 0
     daily_quota: int = 10_000
     state_dir: Path = Path(".ytps")
     output_dir: Path = Path("out")
@@ -60,6 +61,7 @@ class Config:
             client_id=g("YT_OAUTH_CLIENT_ID") or None,
             client_secret=g("YT_OAUTH_CLIENT_SECRET") or None,
             token_path=Path(g("YT_OAUTH_TOKEN_PATH", ".tokens/token.json")),
+            oauth_port=int(g("YT_OAUTH_PORT", "0")),
             daily_quota=int(g("YTPS_DAILY_QUOTA", "10000")),
             state_dir=Path(g("YTPS_STATE_DIR", ".ytps")),
             output_dir=Path(g("YTPS_OUTPUT_DIR", "out")),
