@@ -85,9 +85,21 @@ Schedule that script daily — with cron:
 0 14 * * *  /path/to/project/scripts/daily-publish.sh
 ```
 
-or on macOS with a LaunchAgent (`~/Library/LaunchAgents/`), using
-`StartCalendarInterval`. Either way it exits 0 even when it stops on quota, because
-that is the expected daily outcome rather than a failure.
+or on macOS with a LaunchAgent in `~/Library/LaunchAgents/`. Either way it exits 0 even
+when it stops on quota, because that is the expected daily outcome rather than a failure.
+
+**On a laptop, prefer an interval over a fixed time.** A `StartCalendarInterval` of
+14:00 loses the whole day if the lid happens to be shut at 14:00 — which is most days.
+`StartInterval` polls instead, so the first wake after the quota reset picks the work up:
+
+```xml
+<key>StartInterval</key><integer>7200</integer>
+<key>RunAtLoad</key><true/>
+```
+
+Frequent polling is cheap because an idle run never authenticates: the command checks
+the local queue and ledger first and exits without a single network call when there is
+nothing to do or no quota left.
 
 **Pick the time carefully.** Quota resets at midnight **US/Pacific**, which is 12:30 or
 13:30 the same day in IST, 08:00–09:00 in UK time, and so on. Schedule *after* the reset

@@ -16,7 +16,7 @@ from .errors import YtpsError
 from .models import Playlist, Song
 from .publish.api_writer import estimate
 from .publish.bulk_links import build_links
-from .quota import Quota
+from .quota import Quota, next_reset
 from .reporting import render
 from .tagging import tag_coverage, tag_songs
 from .writers.csv_out import write_csv, write_m3u
@@ -236,6 +236,20 @@ def cmd_publish_queue(a) -> int:
                               "playlists": [asdict(e) for e in st.entries.values()]}, indent=2))
             return 0
         print(render(list(st.entries.values()), st.summary(), quota.status(),
+                     next_run=a.next_run))
+        return 0
+
+    # Decide whether there is anything to do BEFORE authenticating. A scheduler may
+    # fire this many times a day; an idle run should cost no quota and no network.
+    pre = QueueState.load(cfg.state_dir / "queue.json")
+    discover(directory, pre, cfg.state_dir)
+    if pre.summary()["songs_remaining"] == 0:
+        print(render(list(pre.entries.values()), pre.summary(), quota.status()))
+        print("Nothing left to publish.", file=sys.stderr)
+        return 0
+    if quota.remaining() < 100:
+        print(render(list(pre.entries.values()), pre.summary(), quota.status(),
+                     stopped=f"Daily quota already spent. Next window: {next_reset()}.",
                      next_run=a.next_run))
         return 0
 
